@@ -1,0 +1,4 @@
+name: Holoed
+version: '1.0.0'
+main: net.qilla.holoed.Holoed
+api-version: '1.21'
