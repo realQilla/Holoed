@@ -14,6 +14,9 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.qilla.holoed.Holoed;
+import net.qilla.holoed.menugeneral.StackType;
+import net.qilla.qlibrary.util.QColor;
+import net.qilla.qlibrary.util.tools.NumberUtil;
 import net.qilla.qlibrary.util.tools.StringUtil;
 import org.bukkit.Color;
 import org.bukkit.craftbukkit.CraftServer;
@@ -24,8 +27,18 @@ import org.bukkit.craftbukkit.entity.CraftTextDisplay;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.util.Transformation;
+import org.checkerframework.checker.nullness.qual.Nullable;
 import org.jetbrains.annotations.NotNull;
+import org.joml.AxisAngle4f;
+import org.joml.Vector3f;
+
 import java.util.*;
+
+/**
+ * Hologram information container with utility
+ * methods for holograms
+ */
 
 public final class Hologram {
 
@@ -47,13 +60,13 @@ public final class Hologram {
         this.chunkX = pos.blockX() >> 4;
         this.chunkZ = pos.blockZ() >> 4;
 
-        this.localX = this.getLocalPos(pos.toCenter().x());
+        this.localX = this.getLocalCoordinate(pos.toCenter().x());
         this.localY = pos.toCenter().y();
-        this.localZ = this.getLocalPos(pos.toCenter().z());
+        this.localZ = this.getLocalCoordinate(pos.toCenter().z());
         this.settings = new Settings();
     }
 
-    public String getID() {
+    public @NotNull String getID() {
         return this.id;
     }
 
@@ -65,19 +78,11 @@ public final class Hologram {
         return this.chunkZ;
     }
 
-    public double getLocalX() {
-        return this.localX;
+    public @NotNull Position getLocalPosition() {
+        return Position.fine(localX, localY, localZ);
     }
 
-    public double getLocalY() {
-        return this.localY;
-    }
-
-    public double getLocalZ() {
-        return this.localZ;
-    }
-
-    public @NotNull Position getPos() {
+    public @NotNull Position getPosition() {
         double x = (this.chunkX << 4) + this.localX;
         double y = this.localY;
         double z = (this.chunkZ << 4) + this.localZ;
@@ -89,27 +94,35 @@ public final class Hologram {
         return this.settings;
     }
 
-    public void updatePos(@NotNull Position pos) {
+    public void setPosition(@NotNull Position pos) {
         Preconditions.checkNotNull(pos, "Position cannot be null");
 
         this.chunkX = pos.blockX() >> 4;
         this.chunkZ = pos.blockZ() >> 4;
 
-        this.localX = this.getLocalPos(pos.x());
+        this.localX = this.getLocalCoordinate(pos.x());
         this.localY = pos.y();
-        this.localZ = this.getLocalPos(pos.z());
+        this.localZ = this.getLocalCoordinate(pos.z());
     }
 
-    private double getLocalPos(double pos) {
-        return pos - (Math.floor(pos / 16) * 16);
+    private double getLocalCoordinate(double coordinate) {
+        return coordinate - (Math.floor(coordinate / 16) * 16);
     }
 
-    public static @NotNull Set<CraftTextDisplay> createEntities(@NotNull Level level, @NotNull Hologram hologram) {
+    /**
+     * Utility method for converting a Hologram object into
+     * a set of CraftTextDisplay objects that be loaded
+     * into the world.
+     * @param level The NMS level for the entity to use
+     * @param settings List of settings for the hologram to use
+     * @return Returns a list of new CraftTextDisplay objects
+     */
+
+    public static @NotNull List<CraftTextDisplay> getDisplay(@NotNull Level level, @NotNull Settings settings) {
         Preconditions.checkNotNull(level, "Level cannot be null");
-        Preconditions.checkNotNull(hologram, "Holograms cannot be null");
+        Preconditions.checkNotNull(settings, "Settings cannot be null");
 
-        Set<CraftTextDisplay> holoSet = new HashSet<>();
-        Settings settings = hologram.getSettings();
+        List<CraftTextDisplay> holoList = new ArrayList<>();
 
         settings.getText().forEach(component -> {
             CraftTextDisplay display = new CraftTextDisplay((CraftServer) PLUGIN.getServer(), EntityType.TEXT_DISPLAY.create(level, EntitySpawnReason.COMMAND));
@@ -117,12 +130,29 @@ public final class Hologram {
             display.text(component);
             display.setBillboard(settings.getBillboard());
             display.setLineWidth(settings.getLineWidth());
-            display.setSeeThrough(settings.canSeeThrough());
+            display.setSeeThrough(settings.isVisibleThroughBlock());
+            display.setBackgroundColor(Color.fromARGB(settings.getBackgroundColor()));
+            display.setTransformation(
+                    new Transformation(
+                            new Vector3f(),
+                            NumberUtil.toAxisAngle(settings.getPitch(), settings.getYaw(), settings.getRoll()),
+                            new Vector3f(settings.getScale(), settings.getScale(), settings.getScale()),
+                            new AxisAngle4f()
+                    )
+            );
 
-            holoSet.add(display);
+            holoList.add(display);
         });
-        return holoSet;
+        return holoList;
     }
+
+    /**
+     * Converts the hologram object to CraftTextDisplay object's then brings them
+     * into the world, overwriting any pre-existing hologram's with the same ID.
+     * @param player The default player to send these packets to, although they
+     * broadcast to other players.
+     * @param hologram The hologram object to bring into the world.
+     */
 
     public static void loadHologram(@NotNull Player player, @NotNull Hologram hologram) {
         Preconditions.checkNotNull(player, "Player cannot be null");
@@ -132,59 +162,91 @@ public final class Hologram {
         ServerPlayer serverPlayer = ((CraftPlayer) player).getHandle();
         ServerLevel level = ((CraftWorld) player.getWorld()).getHandle();
 
-        Position pos = hologram.getPos();
-        double curY = pos.y();
+        if (registry.isLoaded(hologram.getID())) {
+            registry.getLoaded(hologram.getID()).forEach(entityId ->
+                    level.getChunkSource().broadcastAndSend(serverPlayer, new ClientboundRemoveEntitiesPacket(entityId)));
+            registry.uncacheLoaded(hologram.getID());
+        }
 
-        for(CraftEntity entity : createEntities(level, hologram)) {
-            level.getChunkSource().broadcastAndSend(serverPlayer, new ClientboundAddEntityPacket(entity.getEntityId(), entity.getUniqueId(),
-                    pos.x(), curY, pos.z(),
-                    0f, 0f, EntityType.TEXT_DISPLAY, 0,
-                    new Vec3(0, 0, 0), 0f));
-            level.getChunkSource().broadcastAndSend(serverPlayer, new ClientboundSetEntityDataPacket(entity.getEntityId(), entity.getHandle().getEntityData().packAll()));
+        Position curPos = hologram.getPosition();
+        StackType stackType = hologram.getSettings().getStackType();
+        Position offset = stackType.getOffset(stackType, hologram.getSettings().getLineGap());
+
+        for (CraftEntity entity : getDisplay(level, hologram.getSettings())) {
+            broadcastEntity(level, serverPlayer, entity, curPos);
             registry.cacheLoaded(hologram.getID(), entity.getEntityId());
-            curY -= hologram.getSettings().getTextGap();
+
+            curPos = curPos.offset(offset.x(), offset.y(), offset.z());
         }
     }
+
+    /**
+     * Converts the hologram object to CraftTextDisplay object's then brings them
+     * into the world, overwriting any pre-existing hologram's with the same ID.
+     * @param player The default player to send these packets to, although they
+     * broadcast to other players.
+     * @param holograms The set of hologram object's to bring into the world.
+     */
 
     public static void loadHologram(@NotNull Player player, @NotNull Set<Hologram> holograms) {
         Preconditions.checkNotNull(player, "Player cannot be null");
         Preconditions.checkNotNull(holograms, "Holograms cannot be null");
 
-        HoloRegistry registry = HoloRegistry.getInstance();
-        ServerPlayer serverPlayer = ((CraftPlayer) player).getHandle();
-        ServerLevel level = ((CraftWorld) player.getWorld()).getHandle();
-
         for(Hologram hologram : holograms) {
-            Position pos = hologram.getPos();
-            double curY = pos.y();
-
-            for(CraftEntity entity : createEntities(level, hologram)) {
-                level.getChunkSource().broadcastAndSend(serverPlayer, new ClientboundAddEntityPacket(entity.getEntityId(), entity.getUniqueId(),
-                        pos.x(), curY, pos.z(),
-                        0f, 0f, EntityType.TEXT_DISPLAY, 0,
-                        new Vec3(0, 0, 0), 0f));
-                level.getChunkSource().broadcastAndSend(serverPlayer, new ClientboundSetEntityDataPacket(entity.getEntityId(), entity.getHandle().getEntityData().packAll()));
-                registry.cacheLoaded(hologram.getID(), entity.getEntityId());
-                curY -= hologram.getSettings().getTextGap();
-            }
+            loadHologram(player, hologram);
         }
     }
 
-    public static void unloadHolograms(@NotNull Player player, @NotNull Set<Hologram> holograms) {
+    private static void broadcastEntity(ServerLevel level, ServerPlayer player, CraftEntity entity, Position pos) {
+        level.getChunkSource().broadcastAndSend(player, new ClientboundAddEntityPacket(
+                entity.getEntityId(), entity.getUniqueId(),
+                pos.x(), pos.y(), pos.z(),
+                0f, 0f, EntityType.TEXT_DISPLAY, 0,
+                new Vec3(0, 0, 0), 0f
+        ));
+        level.getChunkSource().broadcastAndSend(player, new ClientboundSetEntityDataPacket(
+                entity.getEntityId(), entity.getHandle().getEntityData().packAll()
+        ));
+    }
+
+    /**
+     * Removes the specified set of holograms from the world
+     * (if they already exist). Note: This does not unregister the hologram.
+     * @param player The default player to send these packets to, although they
+     * broadcast to other players.
+     * @param id Hologram ID to unload from the world.
+     */
+
+    public static void unloadHologram(@NotNull Player player, @NotNull String id) {
         Preconditions.checkNotNull(player, "Player cannot be null");
-        Preconditions.checkNotNull(holograms, "Holograms cannot be null");
+        Preconditions.checkNotNull(id, "ID cannot be null");
 
         HoloRegistry registry = HoloRegistry.getInstance();
         ServerPlayer serverPlayer = ((CraftPlayer) player).getHandle();
         ServerLevel level = ((CraftWorld) player.getWorld()).getHandle();
 
-        for(Hologram holo : holograms) {
-            Set<Integer> holoIds = registry.getLoaded(holo.getID());
+        Set<Integer> holoIds = registry.getLoaded(id);
 
-            for(int entityId : holoIds) {
-                level.getChunkSource().broadcastAndSend(serverPlayer, new ClientboundRemoveEntitiesPacket(entityId));
-            }
-            registry.uncacheLoaded(holo.getID());
+        for(int entityId : holoIds) {
+            level.getChunkSource().broadcastAndSend(serverPlayer, new ClientboundRemoveEntitiesPacket(entityId));
+        }
+        registry.uncacheLoaded(id);
+    }
+
+    /**
+     * Removes the specified set of holograms from the world
+     * (if they already exist). Note: This does not unregister the hologram.
+     * @param player The default player to send these packets to, although they
+     * broadcast to other players.
+     * @param ids Set of hologram ID's to unload from the world.
+     */
+
+    public static void unloadHologram(@NotNull Player player, @NotNull Set<String> ids) {
+        Preconditions.checkNotNull(player, "Player cannot be null");
+        Preconditions.checkNotNull(ids, "List cannot be null");
+
+        for(String id : ids) {
+            unloadHologram(player, id);
         }
     }
 
@@ -203,88 +265,125 @@ public final class Hologram {
 
     public static final class Settings {
 
-        private String id = StringUtil.uniqueIdentifier(8);
         private List<Component> text = new ArrayList<>(List.of(
-                MiniMessage.miniMessage().deserialize("<gradient:gold:white>This is some placeholder text."),
-                MiniMessage.miniMessage().deserialize("<gradient:white:gold>Make sure you don't forget to change this!")
+                MiniMessage.miniMessage().deserialize("<!italic><gradient:gold:white>This is some placeholder text."),
+                MiniMessage.miniMessage().deserialize("<!italic><gradient:white:gold>Make sure you don't forget to change this!")
         ));
-        private float textGap = 0.25f;
+        private StackType stackType = StackType.DOWNWARDS;
+        private float scale = 1.0f;
+        private float lineGap = 0.25f;
+        private boolean visibleThroughBlock = true;
+        private int backgroundColor = 0x0;
         private Display.Billboard billboard = Display.Billboard.CENTER;
-        private boolean visibleThroughBlocks = true;
-        private boolean hasBackground = false;
+        private float yaw = 0;
+        private float pitch = 0;
+        private float roll = 0;
         private int lineWidth = Integer.MAX_VALUE;
 
         private Settings() {
         }
 
-        public Settings id(String id) {
-            this.id = id;
-            return this;
-        }
-
-        public Settings setText(List<Component> text) {
+        public @NotNull Settings setText(@NotNull List<Component> text) {
+            Preconditions.checkNotNull(text, "Text cannot be null");
             this.text = text;
             return this;
         }
 
-        public Settings setText(Component component, int index) {
-            if(this.text.size() < index) this.text.add(component);
-            else this.text.set(index, component);
+        public @NotNull Settings setStackType(@NotNull StackType stackType) {
+            Preconditions.checkNotNull(stackType, "Stack type cannot be null");
+
+            this.stackType = stackType;
             return this;
         }
 
-        public Settings removeText(int index) {
-            if(this.text.size() >= index) this.text.remove(index);
+        public @NotNull Settings lineGap(float lineGap) {
+            this.lineGap = lineGap;
             return this;
         }
 
-        public Settings textSpace(float textSpace) {
-            this.textGap = textSpace;
+        public @NotNull Settings visibleThroughBlock(boolean visibleBlocks) {
+            this.visibleThroughBlock = visibleBlocks;
             return this;
         }
 
-        public Settings billboard(Display.Billboard billboard) {
+        public @NotNull Settings backgroundColor(@NotNull int color) {
+            Preconditions.checkNotNull(color, "Color cannot be null");
+
+            this.backgroundColor = color;
+            return this;
+        }
+
+        public @NotNull Settings billboard(@NotNull Display.Billboard billboard) {
+            Preconditions.checkNotNull(billboard, "Billboard cannot be null");
+
             this.billboard = billboard;
             return this;
         }
 
-        public Settings canSeeThrough(boolean visibleThroughBlocks) {
-            this.visibleThroughBlocks = visibleThroughBlocks;
+        public @NotNull Settings pitch(float pitch) {
+            this.pitch = pitch;
             return this;
         }
 
-        public Settings hasBackground(boolean hasBackground) {
-            this.hasBackground = hasBackground;
+        public @NotNull Settings yaw(float yaw) {
+            this.yaw = yaw;
             return this;
         }
 
-        public Settings lineWidth(int lineWidth) {
+        public @NotNull Settings roll(float roll) {
+            this.roll = roll;
+            return this;
+        }
+
+        public @NotNull Settings lineWidth(int lineWidth) {
             this.lineWidth = lineWidth;
             return this;
         }
 
-        public String getId() {
-            return this.id;
+        public @NotNull Settings scale(float scale) {
+            this.scale = scale;
+            return this;
         }
 
-        public List<Component> getText() {
+        public @NotNull List<Component> getText() {
             return Collections.unmodifiableList(this.text);
         }
 
-        public float getTextGap() {
-            return this.textGap;
+        public @NotNull StackType getStackType() {
+            return this.stackType;
         }
 
-        public Display.Billboard getBillboard() {
+
+        public float getScale() {
+            return this.scale;
+        }
+
+        public float getLineGap() {
+            return this.lineGap;
+        }
+
+        public boolean isVisibleThroughBlock() {
+            return this.visibleThroughBlock;
+        }
+
+        public int getBackgroundColor() {
+            return this.backgroundColor;
+        }
+
+        public @NotNull Display.Billboard getBillboard() {
             return this.billboard;
         }
 
-        public boolean canSeeThrough() {
-            return this.visibleThroughBlocks;
+        public float getPitch() {
+            return this.pitch;
         }
 
-        public boolean hasBackground() {
-            return this.hasBackground;
+        public float getYaw() {
+            return this.yaw;
+        }
+
+        public float getRoll() {
+            return this.roll;
         }
 
         public int getLineWidth() {

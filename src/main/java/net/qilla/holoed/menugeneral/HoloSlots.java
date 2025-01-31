@@ -32,4 +32,14 @@ public class HoloSlots {
                 .material(Material.LOOM)
             .displayName(MiniMessage.miniMessage().deserialize("<aqua>Hologram Modification"))
             .clickSound(QSounds.Menu.MENU_CLICK_ITEM));
+
+    public static final Slot ANGLE_SELECTION_MENU = QSlot.of(builder -> builder
+            .material(Material.RESIN_CLUMP)
+            .displayName(MiniMessage.miniMessage().deserialize("<aqua>Angle Modification"))
+            .clickSound(QSounds.Menu.MENU_CLICK_ITEM));
+
+    public static final Slot COLOR_SELECTION_MENU = QSlot.of(builder -> builder
+            .material(Material.HONEYCOMB)
+            .displayName(MiniMessage.miniMessage().deserialize("<aqua>Color Selection"))
+            .clickSound(QSounds.Menu.MENU_CLICK_ITEM));
 }

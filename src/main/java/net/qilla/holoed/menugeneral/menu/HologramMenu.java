@@ -7,7 +7,6 @@ import net.qilla.holoed.data.HoloPlayerData;
 import net.qilla.holoed.data.HoloRegistry;
 import net.qilla.holoed.menugeneral.HoloSlots;
 import net.qilla.holoed.data.Hologram;
-import net.qilla.qlibrary.data.PlayerData;
 import net.qilla.qlibrary.menu.DynamicConfig;
 import net.qilla.qlibrary.menu.MenuScale;
 import net.qilla.qlibrary.menu.QDynamicMenu;
@@ -46,14 +45,14 @@ public class HologramMenu extends QDynamicMenu<Hologram> {
     @Override
     public @Nullable Socket createSocket(int index, Hologram item) {
         return new QSocket(index, QSlot.of(builder -> builder
-                .material(Material.LIGHT_BLUE_STAINED_GLASS_PANE)
+                .material(Material.LIGHT_BLUE_STAINED_GLASS)
                 .displayName(MiniMessage.miniMessage().deserialize(item.getID()))
                 .lore(ItemLore.lore()
+                        .addLine(Component.empty())
+                        .addLines(item.getSettings().getText())
                         .addLines(List.of(
                                 Component.empty(),
-                                MiniMessage.miniMessage().deserialize("<!italic><yellow><gold>① <key:key.mouse.left></gold> to make modifications"),
-                                MiniMessage.miniMessage().deserialize("<!italic><yellow><gold>② <key:key.mouse.right></gold> to get this item"),
-                                MiniMessage.miniMessage().deserialize("<!italic><yellow><gold>③ <key:key.sneak> + <key:key.mouse.right></gold> to select an amount")
+                                MiniMessage.miniMessage().deserialize("<!italic><yellow><gold>① <key:key.mouse.left></gold> to make modifications")
                         )).build()
                 )
                 .clickSound(QSounds.Menu.MENU_CLICK_ITEM)

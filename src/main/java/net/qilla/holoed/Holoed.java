@@ -3,6 +3,7 @@ package net.qilla.holoed;
 import io.papermc.paper.plugin.lifecycle.event.LifecycleEventManager;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import net.qilla.holoed.command.HoloedCommand;
+import net.qilla.holoed.data.HoloRegistry;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
