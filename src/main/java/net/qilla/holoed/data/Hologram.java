@@ -15,7 +15,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.qilla.holoed.Holoed;
 import net.qilla.holoed.menugeneral.StackType;
-import net.qilla.qlibrary.util.QColor;
 import net.qilla.qlibrary.util.tools.NumberUtil;
 import net.qilla.qlibrary.util.tools.StringUtil;
 import org.bukkit.Color;
@@ -28,7 +27,6 @@ import org.bukkit.entity.Display;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.util.Transformation;
-import org.checkerframework.checker.nullness.qual.Nullable;
 import org.jetbrains.annotations.NotNull;
 import org.joml.AxisAngle4f;
 import org.joml.Vector3f;
@@ -45,25 +43,25 @@ public final class Hologram {
     private static final Plugin PLUGIN = Holoed.getInstance();
 
     private final String id;
-    private int chunkX;
-    private int chunkZ;
-    private double localX;
-    private double localY;
-    private double localZ;
+    private Position position;
     private final Settings settings;
 
-    public Hologram(@NotNull Position pos) {
-        Preconditions.checkNotNull(pos, "Position cannot be null");
+    public Hologram(@NotNull Position position) {
+        Preconditions.checkNotNull(position, "Position cannot be null");
 
         this.id = StringUtil.uniqueIdentifier(8);
-
-        this.chunkX = pos.blockX() >> 4;
-        this.chunkZ = pos.blockZ() >> 4;
-
-        this.localX = this.getLocalCoordinate(pos.toCenter().x());
-        this.localY = pos.toCenter().y();
-        this.localZ = this.getLocalCoordinate(pos.toCenter().z());
+        this.position = position;
         this.settings = new Settings();
+    }
+
+    public Hologram(@NotNull String id, @NotNull Position position, @NotNull Settings settings) {
+        Preconditions.checkNotNull(id, "ID cannot be null");
+        Preconditions.checkNotNull(position, "Position cannot be null");
+        Preconditions.checkNotNull(settings, "Settings cannot be null");
+
+        this.id = id;
+        this.position = position;
+        this.settings = settings;
     }
 
     public @NotNull String getID() {
@@ -71,42 +69,41 @@ public final class Hologram {
     }
 
     public int getChunkX() {
-        return this.chunkX;
+        return position.blockX() >> 4;
     }
 
     public int getChunkZ() {
-        return this.chunkZ;
+        return position.blockZ() >> 4;
     }
 
-    public @NotNull Position getLocalPosition() {
-        return Position.fine(localX, localY, localZ);
+    public double getX() {
+        return position.x();
+    }
+
+    public double getY() {
+        return position.y();
+    }
+
+    public double getZ() {
+        return position.z();
     }
 
     public @NotNull Position getPosition() {
-        double x = (this.chunkX << 4) + this.localX;
-        double y = this.localY;
-        double z = (this.chunkZ << 4) + this.localZ;
-
-        return Position.fine(x, y, z);
+        return this.position;
     }
 
     public @NotNull Settings getSettings() {
         return this.settings;
     }
 
-    public void setPosition(@NotNull Position pos) {
-        Preconditions.checkNotNull(pos, "Position cannot be null");
+    public void setPosition(@NotNull Position position) {
+        Preconditions.checkNotNull(position, "Position cannot be null");
 
-        this.chunkX = pos.blockX() >> 4;
-        this.chunkZ = pos.blockZ() >> 4;
-
-        this.localX = this.getLocalCoordinate(pos.x());
-        this.localY = pos.y();
-        this.localZ = this.getLocalCoordinate(pos.z());
+        this.position = position;
     }
 
-    private double getLocalCoordinate(double coordinate) {
-        return coordinate - (Math.floor(coordinate / 16) * 16);
+    public static Settings settingsBuilder() {
+        return new Settings();
     }
 
     /**
@@ -132,6 +129,7 @@ public final class Hologram {
             display.setLineWidth(settings.getLineWidth());
             display.setSeeThrough(settings.isVisibleThroughBlock());
             display.setBackgroundColor(Color.fromARGB(settings.getBackgroundColor()));
+            display.setBrightness(new Display.Brightness(settings.getBrightness(), settings.getBrightness()));
             display.setTransformation(
                     new Transformation(
                             new Vector3f(),
@@ -158,14 +156,14 @@ public final class Hologram {
         Preconditions.checkNotNull(player, "Player cannot be null");
         Preconditions.checkNotNull(hologram, "Hologram cannot be null");
 
-        HoloRegistry registry = HoloRegistry.getInstance();
+        HologramRegistry registry = HologramRegistry.getInstance();
         ServerPlayer serverPlayer = ((CraftPlayer) player).getHandle();
         ServerLevel level = ((CraftWorld) player.getWorld()).getHandle();
 
         if (registry.isLoaded(hologram.getID())) {
             registry.getLoaded(hologram.getID()).forEach(entityId ->
                     level.getChunkSource().broadcastAndSend(serverPlayer, new ClientboundRemoveEntitiesPacket(entityId)));
-            registry.uncacheLoaded(hologram.getID());
+            registry.removeLoaded(hologram.getID());
         }
 
         Position curPos = hologram.getPosition();
@@ -174,7 +172,7 @@ public final class Hologram {
 
         for (CraftEntity entity : getDisplay(level, hologram.getSettings())) {
             broadcastEntity(level, serverPlayer, entity, curPos);
-            registry.cacheLoaded(hologram.getID(), entity.getEntityId());
+            registry.addLoaded(hologram.getID(), entity.getEntityId());
 
             curPos = curPos.offset(offset.x(), offset.y(), offset.z());
         }
@@ -221,7 +219,7 @@ public final class Hologram {
         Preconditions.checkNotNull(player, "Player cannot be null");
         Preconditions.checkNotNull(id, "ID cannot be null");
 
-        HoloRegistry registry = HoloRegistry.getInstance();
+        HologramRegistry registry = HologramRegistry.getInstance();
         ServerPlayer serverPlayer = ((CraftPlayer) player).getHandle();
         ServerLevel level = ((CraftWorld) player.getWorld()).getHandle();
 
@@ -230,7 +228,7 @@ public final class Hologram {
         for(int entityId : holoIds) {
             level.getChunkSource().broadcastAndSend(serverPlayer, new ClientboundRemoveEntitiesPacket(entityId));
         }
-        registry.uncacheLoaded(id);
+        registry.removeLoaded(id);
     }
 
     /**
@@ -273,6 +271,7 @@ public final class Hologram {
         private float scale = 1.0f;
         private float lineGap = 0.25f;
         private boolean visibleThroughBlock = true;
+        private int brightness = 15;
         private int backgroundColor = 0x0;
         private Display.Billboard billboard = Display.Billboard.CENTER;
         private float yaw = 0;
@@ -303,6 +302,11 @@ public final class Hologram {
 
         public @NotNull Settings visibleThroughBlock(boolean visibleBlocks) {
             this.visibleThroughBlock = visibleBlocks;
+            return this;
+        }
+
+        public @NotNull Settings brightness(int brightness) {
+            this.brightness = brightness;
             return this;
         }
 
@@ -364,6 +368,10 @@ public final class Hologram {
 
         public boolean isVisibleThroughBlock() {
             return this.visibleThroughBlock;
+        }
+
+        public int getBrightness() {
+            return this.brightness;
         }
 
         public int getBackgroundColor() {

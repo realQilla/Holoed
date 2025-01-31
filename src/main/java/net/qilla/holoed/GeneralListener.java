@@ -61,9 +61,10 @@ public class GeneralListener implements Listener {
         event.setCancelled(true);
         float amount;
 
-        if(playerData.getPlayer().isSneaking()) amount = 0.05f;
+        if(playerData.getPlayer().isSneaking()) amount = 0.025f;
         else amount = 0.5f;
         this.shiftHologram(event.getPlayer(), hologram, amount);
+        playerData.getPlayer().playSound(HoloSounds.PULL_HOLOGRAM, true);
     }
 
     @EventHandler
@@ -79,9 +80,10 @@ public class GeneralListener implements Listener {
         event.setCancelled(true);
         float amount;
 
-        if(playerData.getPlayer().isSneaking()) amount = -0.05f;
+        if(playerData.getPlayer().isSneaking()) amount = -0.025f;
         else amount = -0.5f;
         this.shiftHologram(event.getPlayer(), hologram, amount);
+        playerData.getPlayer().playSound(HoloSounds.PUSH_HOLOGRAM, true);
     }
 
     private void shiftHologram(@NotNull Player player, @NotNull Hologram hologram, double shitAmount) {
@@ -114,7 +116,7 @@ public class GeneralListener implements Listener {
 
         long chunkKey = CoordUtil.getChunkKey(chunk.getX(), chunk.getZ());
 
-        HoloRegistry registry = HoloRegistry.getInstance();
+        HologramRegistry registry = HologramRegistry.getInstance();
         Hologram.loadHologram(event.getPlayer(), registry.getWithinChunk(chunkKey));
     }
 
@@ -124,7 +126,7 @@ public class GeneralListener implements Listener {
 
         long chunkKey = CoordUtil.getChunkKey(chunk.getX(), chunk.getZ());
 
-        HoloRegistry registry = HoloRegistry.getInstance();
+        HologramRegistry registry = HologramRegistry.getInstance();
         Set<String> ids = new HashSet<>();
         registry.getWithinChunk(chunkKey).forEach(hologram -> ids.add(hologram.getID()));
         Hologram.unloadHologram(event.getPlayer(), ids);

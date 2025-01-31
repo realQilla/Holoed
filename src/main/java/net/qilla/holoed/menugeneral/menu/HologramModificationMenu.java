@@ -59,7 +59,7 @@ public class HologramModificationMenu extends QStaticMenu {
         List<Socket> socketList = new ArrayList<>(List.of(
                 initiatedHologramSocket(), adjustPositionSocket(), removeSocket(), textSocket(),
                 scaleSocket(), lineGapSocket(), visibleThroughBlockSocket(), billboardSocket(),
-                textStackingSocket(), colorSelectionSocket()
+                textStackingSocket(), colorSelectionSocket(), brightnessSocket()
         ));
 
         if(hologram.getSettings().getBillboard() != Display.Billboard.CENTER) {
@@ -121,7 +121,7 @@ public class HologramModificationMenu extends QStaticMenu {
 
             super.getPlayer().sendMessage(MiniMessage.miniMessage().deserialize("<green>Hologram " + id + " has been successfully removed!"));
             Hologram.unloadHologram(super.getPlayer(), id);
-            HoloRegistry.getInstance().unregister(id);
+            HologramRegistry.getInstance().unregister(id);
             super.getPlayer().playSound(QSounds.Menu.RESET, true);
             return super.returnMenu();
         }, CooldownType.MENU_CLICK);
@@ -137,7 +137,7 @@ public class HologramModificationMenu extends QStaticMenu {
 
         playerData.getPlayer().getInventory().addItem(HoloItems.POSITION_ADJUSTMENT_TOOL);
 
-        super.close();
+        super.getInventory().close();
         future.thenAccept(success -> {
             playerData.getPlayer().playSound(QSounds.General.GENERAL_SUCCESS, true);
             super.open(false);
@@ -167,12 +167,12 @@ public class HologramModificationMenu extends QStaticMenu {
 
         playerData.getPlayer().getInventory().addItem(HoloItems.POSITION_TOOL);
 
-        super.close();
+        super.getInventory().close();
         future.thenAccept(position -> {
             if(hologram == null) {
-                this.hologram = new Hologram(position);
-                HoloRegistry.getInstance().register(this.hologram);
-            } else this.hologram.setPosition(position);
+                hologram = new Hologram(position);
+                HologramRegistry.getInstance().register(hologram);
+            } else hologram.setPosition(position);
             playerData.getPlayer().playSound(QSounds.General.GENERAL_SUCCESS, true);
             super.addSocket(getSettingsSockets());
             super.open(false);
@@ -397,6 +397,46 @@ public class HologramModificationMenu extends QStaticMenu {
         hologram.getSettings().visibleThroughBlock(!visible);
         super.addSocket(visibleThroughBlockSocket());
         Hologram.loadHologram(super.getPlayer(), hologram);
+        return true;
+    }
+
+    public Socket brightnessSocket() {
+        return new QSocket(37, QSlot.of(builder -> builder
+                .material(Material.LIGHT)
+                .displayName(MiniMessage.miniMessage().deserialize("<yellow>Brightness"))
+                .lore(ItemLore.lore(List.of(
+                        MiniMessage.miniMessage().deserialize("<!italic><gray>Current value <white>" + StringUtil.toName(String.valueOf(hologram.getSettings().getBrightness()))),
+                        Component.empty(),
+                        MiniMessage.miniMessage().deserialize("<!italic><yellow><gold>① <key:key.mouse.left></gold> to set value")
+                )))
+                .clickSound(QSounds.Menu.MENU_CLICK_ITEM)
+                .appearSound(QSounds.Menu.MENU_ITEM_APPEAR)
+        ), this::modifyBrightness, CooldownType.MENU_CLICK);
+    }
+
+    private boolean modifyBrightness(InventoryClickEvent event) {
+        ClickType clickType = event.getClick();
+        if(!clickType.isLeftClick()) return false;
+        List<String> signText = List.of(
+                "^^^^^^^^^^^^^^^",
+                "Brightness level",
+                "from 0 to 15");
+
+        new SignInput(super.getPlugin(), super.getPlayerData(), signText).init(result -> {
+            Bukkit.getScheduler().runTask(super.getPlugin(), () -> {
+                if(!result.isEmpty()) {
+                    try {
+                        int input = NumberUtil.minMax(0, 15, Integer.parseInt(result));
+                        hologram.getSettings().brightness(input);
+                        super.getPlayer().playSound(QSounds.Menu.SIGN_INPUT, true);
+                        super.addSocket(brightnessSocket());
+                        Hologram.loadHologram(super.getPlayer(), hologram);
+                    } catch(NumberFormatException ignored) {
+                    }
+                }
+                super.open(false);
+            });
+        });
         return true;
     }
 

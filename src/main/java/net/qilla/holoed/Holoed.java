@@ -3,7 +3,7 @@ package net.qilla.holoed;
 import io.papermc.paper.plugin.lifecycle.event.LifecycleEventManager;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import net.qilla.holoed.command.HoloedCommand;
-import net.qilla.holoed.data.HoloRegistry;
+import net.qilla.holoed.files.HologramsFile;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -13,6 +13,7 @@ public final class Holoed extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        HologramsFile.getInstance().load();
 
         this.initListeners();
         this.initCommands();
