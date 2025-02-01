@@ -129,11 +129,12 @@ public final class Hologram {
             display.setLineWidth(settings.getLineWidth());
             display.setSeeThrough(settings.isVisibleThroughBlock());
             display.setBackgroundColor(Color.fromARGB(settings.getBackgroundColor()));
+            display.setViewRange(settings.getViewRange());
             display.setBrightness(new Display.Brightness(settings.getBrightness(), settings.getBrightness()));
             display.setTransformation(
                     new Transformation(
                             new Vector3f(),
-                            NumberUtil.toAxisAngle(settings.getPitch(), settings.getYaw(), settings.getRoll()),
+                            NumberUtil.toAxisAngle(settings.getYaw(), settings.getPitch(), settings.getRoll()),
                             new Vector3f(settings.getScale(), settings.getScale(), settings.getScale()),
                             new AxisAngle4f()
                     )
@@ -273,6 +274,7 @@ public final class Hologram {
         private boolean visibleThroughBlock = true;
         private int brightness = 15;
         private int backgroundColor = 0x0;
+        private float viewRange = 64;
         private Display.Billboard billboard = Display.Billboard.CENTER;
         private float yaw = 0;
         private float pitch = 0;
@@ -314,6 +316,11 @@ public final class Hologram {
             Preconditions.checkNotNull(color, "Color cannot be null");
 
             this.backgroundColor = color;
+            return this;
+        }
+
+        public @NotNull Settings viewRange(float viewDistance) {
+            this.viewRange = viewDistance;
             return this;
         }
 
@@ -376,6 +383,10 @@ public final class Hologram {
 
         public int getBackgroundColor() {
             return this.backgroundColor;
+        }
+
+        public float getViewRange() {
+            return this.viewRange;
         }
 
         public @NotNull Display.Billboard getBillboard() {

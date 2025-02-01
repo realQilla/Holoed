@@ -133,41 +133,6 @@ public class GeneralListener implements Listener {
     }
 
     @EventHandler
-    private void onInventoryInteract(InventoryInteractEvent event) {
-        InventoryHolder holder = event.getInventory().getHolder();
-
-        if(holder instanceof StaticMenu) {
-            event.setCancelled(true);
-        }
-    }
-
-    @EventHandler
-    private void onInventoryClick(InventoryClickEvent event) {
-        if(event.getClickedInventory() == null) return;
-        if(event.getInventory().getHolder() instanceof StaticMenu menu) {
-            menu.inventoryClickEvent(event);
-        }
-    }
-
-    @EventHandler
-    private void onInventoryOpen(InventoryOpenEvent event) {
-        InventoryHolder holder = event.getInventory().getHolder();
-
-        if(holder instanceof StaticMenu menu) {
-            menu.inventoryOpenEvent(event);
-        }
-    }
-
-    @EventHandler
-    private void onInventoryClose(InventoryCloseEvent event) {
-        InventoryHolder holder = event.getInventory().getHolder();
-
-        if(holder instanceof StaticMenu menu) {
-            menu.inventoryCloseEvent(event);
-        }
-    }
-
-    @EventHandler
     private void onChatEvent(AsyncChatEvent event) {
         Player player = event.getPlayer();
         HoloPlayerData playerData = HoloDataRegistry.getInstance().getData(player);

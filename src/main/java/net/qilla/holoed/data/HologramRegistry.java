@@ -40,18 +40,24 @@ public final class HologramRegistry {
     public void subscribe(@NotNull RegistrySubscriber subscriber) {
         Preconditions.checkNotNull(subscriber, "Subscriber cannot be null");
 
-        registrySubscribers.add(subscriber);
+        synchronized(registrySubscribers) {
+            registrySubscribers.add(subscriber);
+        }
     }
 
     public void unsubscribe(@NotNull RegistrySubscriber subscriber) {
         Preconditions.checkNotNull(subscriber, "Subscriber cannot be null");
 
-        registrySubscribers.remove(subscriber);
+        synchronized(registrySubscribers) {
+            registrySubscribers.remove(subscriber);
+        }
     }
 
     public void notifySubscribers() {
-        for(RegistrySubscriber subscriber : registrySubscribers) {
-            subscriber.onUpdate();
+        synchronized(registrySubscribers) {
+            for(RegistrySubscriber subscriber : registrySubscribers) {
+                subscriber.onUpdate();
+            }
         }
     }
 
@@ -78,8 +84,7 @@ public final class HologramRegistry {
     /**
      * Updates the registry with a new set of holograms.
      *
-     * @param holograms A map where each key is the identifier of a hologram
-     * and the value is the corresponding {@code Hologram} object.
+     * @param holograms A map where each key is the identifier of a hologram and the value is the corresponding {@code Hologram} object.
      */
 
     public void setHolograms(Map<String, Hologram> holograms) {
@@ -101,8 +106,8 @@ public final class HologramRegistry {
      * Retrieves an unmodifiable set of holograms associated with the specified chunk.
      *
      * @param chunkKey The unique key representing a specific chunk
-     * @return A set of {@code Hologram} objects within the specified chunk,
-     * or an empty set if no holograms are present
+     *
+     * @return A set of {@code Hologram} objects within the specified chunk, or an empty set if no holograms are present
      */
 
     public Set<Hologram> getWithinChunk(long chunkKey) {
@@ -127,9 +132,7 @@ public final class HologramRegistry {
     }
 
     /**
-     * Unregisters a hologram from the registry using its unique identifier. If the
-     * hologram is successfully removed, it is also unassociated from its corresponding
-     * chunk in the chunk-based storage.
+     * Unregisters a hologram from the registry using its unique identifier. If the hologram is successfully removed, it is also unassociated from its corresponding chunk in the chunk-based storage.
      *
      * @param hologramID The unique identifier of the hologram to be unregistered.
      */
@@ -146,12 +149,11 @@ public final class HologramRegistry {
     }
 
     /**
-     * Adds the specified entity ID as being loaded for the given hologram ID.
-     * This method associates the entity representing the hologram with its unique identifier,
-     * allowing it to be tracked in the registry of loaded holograms.
+     * Adds the specified entity ID as being loaded for the given hologram ID. This method associates the entity representing the hologram with its unique identifier, allowing it to be tracked in the
+     * registry of loaded holograms.
      *
      * @param hologramID The unique identifier of the hologram. Cannot be null.
-     * @param entityID The ID of the entity to associate with the hologram.
+     * @param entityID   The ID of the entity to associate with the hologram.
      */
 
     public void addLoaded(@NotNull String hologramID, int entityID) {
@@ -162,12 +164,11 @@ public final class HologramRegistry {
     }
 
     /**
-     * Retrieves an unmodifiable set of entity IDs associated with the specified hologram ID
-     * that have been marked as loaded in the registry.
+     * Retrieves an unmodifiable set of entity IDs associated with the specified hologram ID that have been marked as loaded in the registry.
      *
      * @param hologramID The unique identifier of the hologram for which the loaded entities are to be retrieved. Cannot be null.
-     * @return A set of integer entity IDs corresponding to the entities associated with the specified hologram ID,
-     * or an empty set if no entities are loaded for the given hologram ID.
+     *
+     * @return A set of integer entity IDs corresponding to the entities associated with the specified hologram ID, or an empty set if no entities are loaded for the given hologram ID.
      */
 
     public Set<Integer> getLoaded(@NotNull String hologramID) {
@@ -177,12 +178,9 @@ public final class HologramRegistry {
     }
 
     /**
-     * Removes the hologram associated with the specified hologram ID from the
-     * registry of loaded holograms. This effectively marks the hologram as no
-     * longer being loaded in the world.
+     * Removes the hologram associated with the specified hologram ID from the registry of loaded holograms. This effectively marks the hologram as no longer being loaded in the world.
      *
-     * @param hologramID The unique identifier of the hologram to be removed from
-     * the loaded state.
+     * @param hologramID The unique identifier of the hologram to be removed from the loaded state.
      */
 
     public void removeLoaded(@NotNull String hologramID) {
@@ -195,6 +193,7 @@ public final class HologramRegistry {
      * Checks whether the hologram with the specified ID is currently loaded.
      *
      * @param hologramID The unique identifier of the hologram to check. Cannot be null.
+     *
      * @return {@code true} if the hologram with the given ID is loaded; otherwise, {@code false}.
      */
 

@@ -14,8 +14,6 @@ import net.qilla.holoed.menugeneral.StackType;
 import net.qilla.qlibrary.menu.MenuScale;
 import net.qilla.qlibrary.menu.QStaticMenu;
 import net.qilla.qlibrary.menu.StaticConfig;
-import net.qilla.qlibrary.menu.input.ChatInput;
-import net.qilla.qlibrary.menu.input.SignInput;
 import net.qilla.qlibrary.menu.socket.QSlot;
 import net.qilla.qlibrary.menu.socket.QSocket;
 import net.qilla.qlibrary.menu.socket.Socket;
@@ -23,7 +21,6 @@ import net.qilla.qlibrary.player.CooldownType;
 import net.qilla.qlibrary.util.sound.QSounds;
 import net.qilla.qlibrary.util.tools.NumberUtil;
 import net.qilla.qlibrary.util.tools.StringUtil;
-import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Display;
 import org.bukkit.event.inventory.ClickType;
@@ -52,14 +49,15 @@ public class HologramModificationMenu extends QStaticMenu {
     public HologramModificationMenu(@NotNull Plugin plugin, @NotNull HoloPlayerData playerData) {
         super(plugin, playerData);
 
-        super.addSocket(initiateHologramSocket(), 25);
+        super.addSocket(initiateHologramSocket(), 250);
     }
 
     private List<Socket> getSettingsSockets() {
         List<Socket> socketList = new ArrayList<>(List.of(
                 initiatedHologramSocket(), adjustPositionSocket(), removeSocket(), textSocket(),
                 scaleSocket(), lineGapSocket(), visibleThroughBlockSocket(), billboardSocket(),
-                textStackingSocket(), colorSelectionSocket(), brightnessSocket()
+                textStackingSocket(), colorSelectionSocket(), brightnessSocket(), viewRangeSocket(),
+                yawRotateSocket(), pitchRotateSocket(), rollRotateSocket()
         ));
 
         if(hologram.getSettings().getBillboard() != Display.Billboard.CENTER) {
@@ -225,19 +223,18 @@ public class HologramModificationMenu extends QStaticMenu {
 
         if(clickType.isLeftClick()) {
             if(clickType.isShiftClick()) {
-                String chatText = "<yellow>Type the item's lore for line <gold>" + (textCycle + 1) + "</gold> using the <gold><hover:show_text:'https://docs.advntr.dev/minimessage/format'><click:open_url:'https://docs.advntr.dev/minimessage/format'>MiniMessage</gold> format. Create a blank line by typing EMPTY, and CANCEL to return.";
+                String chatText = "<yellow>Type the item's lore for line <gold>" + (textCycle + 1) +
+                        "</gold> using the <gold><hover:show_text:'https://docs.advntr.dev/minimessage/format'><click:open_url:'https://docs.advntr.dev/minimessage/format'>MiniMessage</gold> format. Create a blank line by typing EMPTY, and CANCEL to return.";
 
-                new ChatInput(super.getPlugin(), super.getPlayerData(), MiniMessage.miniMessage().deserialize(chatText)).init(result -> {
-                    Bukkit.getScheduler().runTask(super.getPlugin(), () -> {
-                        if(!result.equalsIgnoreCase("cancel") && !result.isEmpty()) {
-                            applyLine(result.equalsIgnoreCase("empty") ? Component.empty() : MiniMessage.miniMessage().deserialize(result), textList);
+                super.requestChatInput(List.of(MiniMessage.miniMessage().deserialize(chatText)), result -> {
+                    if(!result.equalsIgnoreCase("cancel") && !result.isEmpty()) {
+                        applyLine(result.equalsIgnoreCase("empty") ? Component.empty() : MiniMessage.miniMessage().deserialize(result), textList);
 
-                            super.addSocket(textSocket());
-                            super.getPlayer().playSound(QSounds.Menu.SIGN_INPUT, true);
-                            Hologram.loadHologram(super.getPlayer(), hologram);
-                        }
-                        super.open(false);
-                    });
+                        super.addSocket(textSocket());
+                        super.getPlayer().playSound(QSounds.Menu.SIGN_INPUT, true);
+                        Hologram.loadHologram(super.getPlayer(), hologram);
+                    }
+                    super.open(false);
                 });
             } else {
                 textCycle++;
@@ -312,19 +309,15 @@ public class HologramModificationMenu extends QStaticMenu {
                 )))
                 .clickSound(QSounds.Menu.MENU_CLICK_ITEM)
                 .appearSound(QSounds.Menu.MENU_ITEM_APPEAR)
-        ), this::modifyScale, CooldownType.MENU_CLICK);
-    }
+        ), event -> {
+            ClickType clickType = event.getClick();
+            if(!clickType.isLeftClick()) return false;
+            List<String> signText = List.of(
+                    "^^^^^^^^^^^^^^^",
+                    "The scale of",
+                    "the text");
 
-    private boolean modifyScale(InventoryClickEvent event) {
-        ClickType clickType = event.getClick();
-        if(!clickType.isLeftClick()) return false;
-        List<String> signText = List.of(
-                "^^^^^^^^^^^^^^^",
-                "The scale of",
-                "the text");
-
-        new SignInput(super.getPlugin(), super.getPlayerData(), signText).init(result -> {
-            Bukkit.getScheduler().runTask(super.getPlugin(), () -> {
+            super.requestSignInput(signText, result -> {
                 if(!result.isEmpty()) {
                     float scale = NumberUtil.minMax(0f, Float.MAX_VALUE, Float.parseFloat(result));
                     hologram.getSettings().scale(scale);
@@ -334,8 +327,8 @@ public class HologramModificationMenu extends QStaticMenu {
                 }
                 super.open(false);
             });
-        });
-        return true;
+            return true;
+        }, CooldownType.MENU_CLICK);
     }
 
     public Socket lineGapSocket() {
@@ -349,19 +342,11 @@ public class HologramModificationMenu extends QStaticMenu {
                 )))
                 .clickSound(QSounds.Menu.MENU_CLICK_ITEM)
                 .appearSound(QSounds.Menu.MENU_ITEM_APPEAR)
-        ), this::modifyLineGap, CooldownType.MENU_CLICK);
-    }
-
-    private boolean modifyLineGap(InventoryClickEvent event) {
-        ClickType clickType = event.getClick();
-        if(!clickType.isLeftClick()) return false;
-        List<String> signText = List.of(
-                "^^^^^^^^^^^^^^^",
-                "Amount of space",
-                "between lines");
-
-        new SignInput(super.getPlugin(), super.getPlayerData(), signText).init(result -> {
-            Bukkit.getScheduler().runTask(super.getPlugin(), () -> {
+        ), event -> {
+            ClickType clickType = event.getClick();
+            if(!clickType.isLeftClick()) return false;
+            List<String> signText = List.of("^^^^^^^^^^^^^^^", "Amount of space", "between lines");
+            super.requestSignInput(signText, result -> {
                 if(!result.isEmpty()) {
                     float space = NumberUtil.minMax(0f, Float.MAX_VALUE, Float.parseFloat(result));
                     hologram.getSettings().lineGap(space);
@@ -371,8 +356,8 @@ public class HologramModificationMenu extends QStaticMenu {
                 }
                 super.open(false);
             });
-        });
-        return true;
+            return true;
+        }, CooldownType.MENU_CLICK);
     }
 
     public Socket visibleThroughBlockSocket() {
@@ -411,19 +396,11 @@ public class HologramModificationMenu extends QStaticMenu {
                 )))
                 .clickSound(QSounds.Menu.MENU_CLICK_ITEM)
                 .appearSound(QSounds.Menu.MENU_ITEM_APPEAR)
-        ), this::modifyBrightness, CooldownType.MENU_CLICK);
-    }
-
-    private boolean modifyBrightness(InventoryClickEvent event) {
-        ClickType clickType = event.getClick();
-        if(!clickType.isLeftClick()) return false;
-        List<String> signText = List.of(
-                "^^^^^^^^^^^^^^^",
-                "Brightness level",
-                "from 0 to 15");
-
-        new SignInput(super.getPlugin(), super.getPlayerData(), signText).init(result -> {
-            Bukkit.getScheduler().runTask(super.getPlugin(), () -> {
+        ), event -> {
+            ClickType clickType = event.getClick();
+            if(!clickType.isLeftClick()) return false;
+            List<String> signText = List.of("^^^^^^^^^^^^^^^", "Brightness level", "from 0 to 15");
+            super.requestSignInput(signText, result -> {
                 if(!result.isEmpty()) {
                     try {
                         int input = NumberUtil.minMax(0, 15, Integer.parseInt(result));
@@ -436,8 +413,8 @@ public class HologramModificationMenu extends QStaticMenu {
                 }
                 super.open(false);
             });
-        });
-        return true;
+            return true;
+        }, CooldownType.MENU_CLICK);
     }
 
     public Socket colorSelectionSocket() {
@@ -495,22 +472,7 @@ public class HologramModificationMenu extends QStaticMenu {
 
         }
 
-        if(hologram.getSettings().getBillboard() != Display.Billboard.CENTER) {
-            super.addSocket(yawRotateSocket());
-            super.addSocket(pitchRotateSocket());
-            super.addSocket(rollRotateSocket());
-        } else {
-            Hologram.Settings settings = hologram.getSettings();
-            settings.yaw(0);
-            settings.pitch(0);
-            settings.roll(0);
-
-            super.removeSocket(yawRotateSocket().index());
-            super.removeSocket(pitchRotateSocket().index());
-            super.removeSocket(rollRotateSocket().index());
-        }
         super.addSocket(billboardSocket());
-
         Hologram.loadHologram(super.getPlayer(), hologram);
         return true;
     }
@@ -535,6 +497,7 @@ public class HologramModificationMenu extends QStaticMenu {
                 Hologram.loadHologram(super.getPlayer(), hologram);
                 return true;
             } else if(!clickType.isLeftClick()) return false;
+
             CompletableFuture<Float> future = new CompletableFuture<>();
             this.inputAngle(future);
             future.thenAccept(yaw -> {
@@ -566,6 +529,7 @@ public class HologramModificationMenu extends QStaticMenu {
                 Hologram.loadHologram(super.getPlayer(), hologram);
                 return true;
             } else if(!clickType.isLeftClick()) return false;
+
             CompletableFuture<Float> future = new CompletableFuture<>();
             this.inputAngle(future);
             future.thenAccept(pitch -> {
@@ -597,11 +561,12 @@ public class HologramModificationMenu extends QStaticMenu {
                 Hologram.loadHologram(super.getPlayer(), hologram);
                 return true;
             } else if(!clickType.isLeftClick()) return false;
+
             CompletableFuture<Float> future = new CompletableFuture<>();
             this.inputAngle(future);
             future.thenAccept(roll -> {
                 hologram.getSettings().roll(roll);
-                super.addSocket(pitchRotateSocket());
+                super.addSocket(rollRotateSocket());
                 Hologram.loadHologram(super.getPlayer(), hologram);
             });
             return true;
@@ -609,31 +574,58 @@ public class HologramModificationMenu extends QStaticMenu {
     }
 
     private void inputAngle(CompletableFuture<Float> future) {
-        List<String> signText = List.of(
-                "^^^^^^^^^^^^^^^",
-                "Angle from",
-                "0 to 360");
+        List<String> signText = List.of("^^^^^^^^^^^^^^^", "Angle from", "0 to 360");
 
-        new SignInput(super.getPlugin(), super.getPlayerData(), signText).init(result -> {
-            Bukkit.getScheduler().runTask(super.getPlugin(), () -> {
+        super.requestSignInput(signText, result -> {
+            if(!result.isEmpty()) {
+                try {
+                    float input = Float.parseFloat(result);
+                    future.complete(input);
+                    super.getPlayer().playSound(QSounds.Menu.SIGN_INPUT, true);
+                } catch(NumberFormatException ignored) {
+                }
+            }
+            super.open(false);
+        });
+    }
+
+    public Socket viewRangeSocket() {
+        return new QSocket(38, QSlot.of(builder -> builder
+                .material(Material.OMINOUS_BOTTLE)
+                .displayName(MiniMessage.miniMessage().deserialize("<dark_aqua>View Range"))
+                .lore(ItemLore.lore(List.of(
+                        MiniMessage.miniMessage().deserialize("<!italic><gray>Current value <white>" + NumberUtil.decimalTruncation(hologram.getSettings().getViewRange(), 1)),
+                        Component.empty(),
+                        MiniMessage.miniMessage().deserialize("<!italic><yellow><gold>① <key:key.mouse.left></gold> to make modifications"),
+                        MiniMessage.miniMessage().deserialize("<!italic><yellow><gold>② <key:key.mouse.right></gold> to reset")
+                )))
+                .clickSound(QSounds.Menu.MENU_CLICK_ITEM)
+                .appearSound(QSounds.Menu.MENU_ITEM_APPEAR)
+        ), event -> {
+            ClickType clickType = event.getClick();
+            if(!clickType.isLeftClick()) return false;
+            List<String> signText = List.of("^^^^^^^^^^^^^^^", "Hologram", "view distance");
+
+            super.requestSignInput(signText, result -> {
                 if(!result.isEmpty()) {
                     try {
-                        float input = Float.parseFloat(result);
-                        future.complete(input);
+                        float input = Math.max(0, Float.parseFloat(result));
+                        hologram.getSettings().viewRange(input);
                         super.getPlayer().playSound(QSounds.Menu.SIGN_INPUT, true);
+                        super.addSocket(viewRangeSocket());
+                        Hologram.loadHologram(super.getPlayer(), hologram);
                     } catch(NumberFormatException ignored) {
                     }
                 }
                 super.open(false);
             });
-        });
+            return true;
+        }, CooldownType.MENU_CLICK);
     }
 
     @Override
     public void refreshSockets() {
-        if(hologram != null) {
-            super.addSocket(getSettingsSockets());
-        }
+        if(hologram != null) super.addSocket(getSettingsSockets());
     }
 
     @Override

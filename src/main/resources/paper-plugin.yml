@@ -1,4 +1,11 @@
 name: Holoed
 version: '1.0.0'
+author: Qilla
 main: net.qilla.holoed.Holoed
 api-version: '1.21'
+
+dependencies:
+  server:
+    PlayerHolderAPI:
+      load: BEFORE
+      required: false

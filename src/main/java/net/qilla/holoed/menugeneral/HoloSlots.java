@@ -18,7 +18,7 @@ public class HoloSlots {
             .clickSound(QSounds.Menu.MENU_CLICK_ITEM)
     );
 
-    public static final Slot MODIFICATION_CREATE = QSlot.of(builder -> builder
+    public static final Slot HOLOGRAM_CREATE = QSlot.of(builder -> builder
             .material(Material.GREEN_BUNDLE)
             .displayName(MiniMessage.miniMessage().deserialize("<green>Create New"))
             .lore(ItemLore.lore(List.of(

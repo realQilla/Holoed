@@ -12,7 +12,6 @@ import net.qilla.qlibrary.menu.DynamicConfig;
 import net.qilla.qlibrary.menu.MenuScale;
 import net.qilla.qlibrary.menu.QDynamicMenu;
 import net.qilla.qlibrary.menu.StaticConfig;
-import net.qilla.qlibrary.menu.input.SignInput;
 import net.qilla.qlibrary.menu.socket.QSlot;
 import net.qilla.qlibrary.menu.socket.QSocket;
 import net.qilla.qlibrary.menu.socket.Slots;
@@ -21,7 +20,6 @@ import net.qilla.qlibrary.player.CooldownType;
 import net.qilla.qlibrary.registry.RegistrySubscriber;
 import net.qilla.qlibrary.util.sound.QSounds;
 import org.bukkit.Bukkit;
-import org.bukkit.Material;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.plugin.Plugin;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -33,20 +31,13 @@ public class HologramMenu extends QDynamicMenu<Hologram> implements RegistrySubs
     public HologramMenu(@NotNull Plugin plugin, @NotNull HoloPlayerData playerData) {
         super(plugin, playerData, HologramRegistry.getInstance().getHolograms());
 
-        super.addSocket(new QSocket(46, HoloSlots.MODIFICATION_CREATE, event -> {
-            ClickType clickType = event.getClick();
-            if(clickType.isLeftClick()) {
-                new HologramModificationMenu(plugin, playerData).open(true);
-                return true;
-            } else return false;
-        }, CooldownType.OPEN_MENU));
+        super.addSocket(createHologramSocket());
         super.addSocket(saveItemsSocket());
         super.addSocket(reloadItemsSocket());
         super.addSocket(clearItemsSocket());
-
-        HologramRegistry.getInstance().subscribe(this);
         super.populateModular();
         super.finalizeMenu();
+        HologramRegistry.getInstance().subscribe(this);
     }
 
     @Override
@@ -70,89 +61,77 @@ public class HologramMenu extends QDynamicMenu<Hologram> implements RegistrySubs
                 .clickSound(QSounds.Menu.MENU_CLICK_ITEM)
         ), event -> {
             ClickType clickType = event.getClick();
-            if(clickType.isLeftClick()) {
-                new HologramModificationMenu(super.getPlugin(), (HoloPlayerData) super.getPlayerData(), item).open(true);
-                return true;
-            } else return false;
+            if(!clickType.isLeftClick()) return false;
+            new HologramModificationMenu(super.getPlugin(), (HoloPlayerData) super.getPlayerData(), item).open(true);
+            return true;
+        }, CooldownType.OPEN_MENU);
+    }
 
+    private Socket createHologramSocket() {
+        return new QSocket(46, HoloSlots.HOLOGRAM_CREATE, event -> {
+            ClickType clickType = event.getClick();
+            if(!clickType.isLeftClick()) return false;
+            new HologramModificationMenu(super.getPlugin(), (HoloPlayerData) super.getPlayerData()).open(true);
+            return true;
         }, CooldownType.OPEN_MENU);
     }
 
     private Socket saveItemsSocket() {
         return new QSocket(0, Slots.SAVED_CHANGES, event -> {
             ClickType clickType = event.getClick();
-            if(clickType.isLeftClick()) {
-                List<String> signText = List.of(
-                        "^^^^^^^^^^^^^^^",
-                        "Type CONFIRM",
-                        "to save"
-                );
-
-                SignInput signInput = new SignInput(super.getPlugin(), super.getPlayerData(), signText);
-                signInput.init(result -> {
-                    Bukkit.getScheduler().runTask(super.getPlugin(), () -> {
-                        if(result.equals("CONFIRM")) {
-                            Bukkit.getScheduler().runTaskAsynchronously(super.getPlugin(), () -> HologramsFile.getInstance().save());
-                            super.getPlayer().sendMessage("<yellow>Custom holograms <green><bold>SAVED</green>!");
-                            super.getPlayer().playSound(QSounds.General.GENERAL_SUCCESS, true);
-                        }
-                        super.open(false);
-                    });
+            if(!clickType.isLeftClick()) return false;
+            List<String> signText = List.of(
+                    "^^^^^^^^^^^^^^^", "Type CONFIRM", "to save"
+            );
+            super.requestSignInput(signText, result -> {
+                Bukkit.getScheduler().runTask(super.getPlugin(), () -> {
+                    if(result.equals("CONFIRM")) {
+                        Bukkit.getScheduler().runTaskAsynchronously(super.getPlugin(), () -> HologramsFile.getInstance().save());
+                        super.getPlayer().sendMessage("<yellow>Custom holograms <green><bold>SAVED</green>!");
+                        super.getPlayer().playSound(QSounds.General.GENERAL_SUCCESS, true);
+                    }
+                    super.open(false);
                 });
-                return true;
-            } else return false;
+            });
+            return true;
         }, CooldownType.MENU_CLICK);
     }
 
     private Socket reloadItemsSocket() {
         return new QSocket(1, Slots.RELOADED_CHANGES, event -> {
             ClickType clickType = event.getClick();
-            if(clickType.isLeftClick()) {
-                List<String> signText = List.of(
-                        "^^^^^^^^^^^^^^^",
-                        "Type CONFIRM",
-                        "to reload"
-                );
-
-                SignInput signInput = new SignInput(super.getPlugin(), super.getPlayerData(), signText);
-                signInput.init(result -> {
-                    Bukkit.getScheduler().runTask(super.getPlugin(), () -> {
-                        if(result.equals("CONFIRM")) {
-                            Bukkit.getScheduler().runTaskAsynchronously(super.getPlugin(), () -> HologramsFile.getInstance().load());
-                            super.getPlayer().sendMessage("<yellow>Custom holograms have been <aqua><bold>RELOADED</aqua>!");
-                            super.getPlayer().playSound(QSounds.General.GENERAL_SUCCESS, true);
-                        }
-                        super.open(false);
-                    });
-                });
-                return true;
-            } else return false;
+            if(!clickType.isLeftClick()) return false;
+            List<String> signText = List.of(
+                    "^^^^^^^^^^^^^^^", "Type CONFIRM", "to reload"
+            );
+            super.requestSignInput(signText, result -> {
+                if(result.equals("CONFIRM")) {
+                    Bukkit.getScheduler().runTaskAsynchronously(super.getPlugin(), () -> HologramsFile.getInstance().load());
+                    super.getPlayer().sendMessage("<yellow>Custom holograms have been <aqua><bold>RELOADED</aqua>!");
+                    super.getPlayer().playSound(QSounds.General.GENERAL_SUCCESS, true);
+                }
+                super.open(false);
+            });
+            return true;
         }, CooldownType.MENU_CLICK);
     }
 
     private Socket clearItemsSocket() {
         return new QSocket(2, Slots.CLEAR_SAVED, event -> {
             ClickType clickType = event.getClick();
-            if(clickType.isLeftClick()) {
-                List<String> signText = List.of(
-                        "^^^^^^^^^^^^^^^",
-                        "Type CONFIRM",
-                        "to clear"
-                );
-
-                SignInput signInput = new SignInput(super.getPlugin(), super.getPlayerData(), signText);
-                signInput.init(result -> {
-                    Bukkit.getScheduler().runTask(super.getPlugin(), () -> {
-                        if(result.equals("CONFIRM")) {
-                            Bukkit.getScheduler().runTaskAsynchronously(super.getPlugin(), () -> HologramsFile.getInstance().clear());
-                            super.getPlayer().sendMessage("<yellow>All holograms have been <red><bold>CLEARED</red>!");
-                            super.getPlayer().playSound(QSounds.General.GENERAL_SUCCESS_2, true);
-                        }
-                        super.open(false);
-                    });
-                });
-                return true;
-            } else return false;
+            if(!clickType.isLeftClick()) return false;
+            List<String> signText = List.of(
+                    "^^^^^^^^^^^^^^^", "Type CONFIRM", "to clear"
+            );
+            super.requestSignInput(signText, result -> {
+                if(result.equals("CONFIRM")) {
+                    Bukkit.getScheduler().runTaskAsynchronously(super.getPlugin(), () -> HologramsFile.getInstance().clear());
+                    super.getPlayer().sendMessage("<yellow>All holograms have been <red><bold>CLEARED</red>!");
+                    super.getPlayer().playSound(QSounds.General.GENERAL_SUCCESS_2, true);
+                }
+                super.open(false);
+            });
+            return true;
         }, CooldownType.MENU_CLICK);
     }
 
